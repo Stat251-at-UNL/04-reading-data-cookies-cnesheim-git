@@ -67,9 +67,10 @@ skim(cookie_data,
      Rating,
      Quantity)
 ```
-
 ```{python}
-import skimpy as sk
+import skimpy
+
+skimpy.skim(cookie_data_py[["Ingredient", "Rating", "Quantity"]])
 ```
 
 [Part 2] Write 1-2 sentences about what you can tell from each summary display you generate. Did you discover anything new about the data?
@@ -86,24 +87,70 @@ You may want to use the `dplyr` package in R (`group_by` or `count` functions), 
 ```{r}
 library(tidyverse)
 
-cookie_data |>
-  group_by(Ingredient)
+total_recipes <- cookie_data |>
+  distinct(Recipe_Index) |>
+  nrow()
+
+ingred_prop <- cookie_data |>
+  distinct(Recipe_Index, Ingredient) |>
+  count(Ingredient, name = "recipe_count") |>
+  mutate(prop = recipe_count / total_recipes) |>
+  arrange(desc(recipe_count)) |>
+  slice_max(recipe_count, n=20)
+
+ingred_prop
 ```
 
 ```{python}
+total_recipes_py = cookie_data_py["Recipe_Index"].drop_duplicates().shape[0]
 
+ingred_prop_py = (cookie_data_py.groupby("Ingredient").agg(recipe_count=("Recipe_Index", "nunique")))
+
+ingred_prop_py["prop"] = ingred_prop_py["recipe_count"] / total_recipes_py
+
+ingred_prop_py = ingred_prop_py.nlargest(20, "recipe_count", keep="all")
+
+ingred_prop_py
 ```
 
 
 [Part 2] Print out a character string that lists all of the ingredients that do not appear in at least 20 recipes.
+There are `r nrow(rare_ingred)` rare ingredients that do not appear in at least 20 recipes.
+The rare ingredients are:
+```{r}
+rare_ingred <- cookie_data |>
+  distinct(Recipe_Index, Ingredient) |>
+  count(Ingredient, name="recipe_count") |>
+  filter(recipe_count < 20)
 
+rare_ingred_str <- rare_ingred |>
+  pull(Ingredient) |>
+  paste(collapse = ", ")
 
-(Delete this note, but you can include data values inline in markdown text by using backticks, at least in R. For instance, here is R's built in value for pi: `r pi`. Unfortunately, this doesn't work in python using the knitr markdown engine, but you can print the list out in python anyways using a code chunk.)
+print(rare_ingred_str)
+```
 
 ### Visualization
 
 Using whatever plotting system you are comfortable with in R or python, see if you can create a couple of useful exploratory data visualizations which address one of the questions you wrote above - or another question which you've come up with as you've worked on this assignment.
 
 [Part 1] Create at least one plot (it doesn't have to be pretty) that showcases an interesting facet of the data.
+```{r}
+library(ggplot2)
+
+best_ingred <- cookie_data |> group_by(Ingredient) |>
+  summarise(avg_rating = mean(Rating, na.rm=T), n=n(), missing_ratings=sum(is.na(Rating)))|> 
+  select(Ingredient, avg_rating, n) |>
+  arrange(desc(avg_rating))
+
+best_ingred_top20 <- best_ingred |>
+  slice_max(avg_rating, n=20, with_ties=TRUE)
+
+ggplot(best_ingred_top20, aes(x= reorder(Ingredient, avg_rating), y=avg_rating)) +
+  geom_col() + coord_flip()
+
+```
 
 [Part 2] Write 2-3 sentences about what you can learn from that plot and what directions you might want to investigate from here.
+
+I learned that the top three ingredients that appear in the highest rated recipes are corn syrup, bourbon, and pudding mix. These are rather rare ingredients, I would say. So maybe my next investigation could be what ingredients are in the highest rated recipes that appear at least x amount of times (maybe 10? 15?). Or, what quantitiy of eggs seem to be the highest rated (one or two or more eggs), or flour (what cup amount).
